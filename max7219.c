@@ -96,46 +96,6 @@ void matrix_update(void)
     matrix_clear();
     }
 
-/*
-//-------------------------------------------------------------------------------------------------
-// print a character  //xpos: 0-  //character code: 0-255
-//-------------------------------------------------------------------------------------------------
-void matrix_char(uint8_t xpos, uint8_t code)
-    {
-    uint8_t c=0;
-
-    if(code>=48 && code<=58) c=code-48;
-    else if(code>=65 && code<=90) c=code-65+14;
-    else if(code==32) c=11;
-    else if(code==43) c=12;
-    else if(code==45) c=13;
-    else c=40;
-
-    for(uint8_t y=0; y<8; y++)
-        {
-        for(uint8_t x=0; x<5; x++)
-            {
-            if(REG_BIT_IS_SET(font5x8[c*8+y],(4-x))) MATRIX_BUFF_PIXEL_ON((uint8_t)(x+xpos), y);
-            }
-        }
-    }
-
-
-//-------------------------------------------------------------------------------------------------
-// print a string  //x: 0-
-//-------------------------------------------------------------------------------------------------
-void matrix_print(uint8_t xpos, const char *str)
-    {
-    for(; *str; xpos+=7) matrix_char(xpos,*str++);
-    }
-
-
-//-------------------------------------------------------------------------------------------------
-void matrix_print_compact(uint8_t xpos, const char *str)
-    {
-    for(; *str; xpos+=6) matrix_char(xpos,*str++);
-    }
-*/
 
 //-------------------------------------------------------------------------------------------------
 void matrix_char_small(uint8_t xpos, uint8_t code)
@@ -230,5 +190,11 @@ void matrix_print_shift(uint16_t xpos, const char *str)
     for(; *str; xpos+=7) matrix_char_shift(xpos,*str++);
     }
 
+
+//-------------------------------------------------------------------------------------------------
+void matrix_print_shift_compact(uint8_t xpos, const char *str)
+    {
+    for(; *str; xpos+=6) matrix_char_shift(xpos,*str++);
+    }
 
 

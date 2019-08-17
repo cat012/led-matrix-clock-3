@@ -71,11 +71,7 @@ void matrix_clear(void);
 void matrix_fill(void);
 
 void matrix_update(void);
-/*
-void matrix_char(uint8_t xpos, uint8_t code);
-void matrix_print(uint8_t xpos, const char *str);
-void matrix_print_compact(uint8_t xpos, const char *str);
- */
+
 void matrix_char_small(uint8_t xpos, uint8_t code);
 void matrix_print_small(uint8_t xpos, const char *str);
 
@@ -84,6 +80,7 @@ void matrix_copy_shift(uint16_t cpos);
 void matrix_pixel_shift(uint16_t xpos, uint8_t ypos, uint8_t on);
 void matrix_char_shift(uint16_t xpos, uint8_t code);
 void matrix_print_shift(uint16_t xpos, const char *str);
+void matrix_print_shift_compact(uint8_t xpos, const char *str);
 
 
 #define MAX7219_NUM  4U

@@ -27,8 +27,14 @@ uint8_t strbufflen=0;
 uint16_t scrpos=0xffff;
 
 volatile uint8_t scrcnt=0;
+volatile uint8_t btncnt=0;
+volatile uint8_t hldcnt=0;
 
-const uint16_t keysadc[5] = { 55, 145, 300, 515, 820 };
+const uint8_t keysadc = 0xff;
+
+uint8_t scrbright=0;
+
+uint8_t scrmode=0;
 
 
 const char DAY_1_EN[]="MONDAY";
@@ -54,26 +60,26 @@ const char MONTH_12_EN[]="DECEMBER";
 
 #pragma warning disable 228
 
-const char DAY_1_RU[]="œŒÕ≈ƒ≈À‹Õ» ";
-const char DAY_2_RU[]="¬“Œ–Õ» ";
-const char DAY_3_RU[]="—–≈ƒ¿";
-const char DAY_4_RU[]="◊≈“¬≈–√";
-const char DAY_5_RU[]="œﬂ“Õ»÷¿";
-const char DAY_6_RU[]="—”¡¡Œ“¿";
-const char DAY_7_RU[]="¬Œ— –≈—≈Õ‹≈";
+const char DAY_1_RU[]="–ü–û–ù–ï–î–ï–õ–¨–ù–ò–ö";
+const char DAY_2_RU[]="–í–¢–û–†–ù–ò–ö";
+const char DAY_3_RU[]="–°–†–ï–î–ê";
+const char DAY_4_RU[]="–ß–ï–¢–í–ï–†–ì";
+const char DAY_5_RU[]="–ü–Ø–¢–ù–ò–¶–ê";
+const char DAY_6_RU[]="–°–£–ë–ë–û–¢–ê";
+const char DAY_7_RU[]="–í–û–°–ö–†–ï–°–ï–ù–¨–ï";
 
-const char MONTH_1_RU[]="ﬂÕ¬¿–‹";
-const char MONTH_2_RU[]="‘≈¬–¿À‹";
-const char MONTH_3_RU[]="Ã¿–“";
-const char MONTH_4_RU[]="¿œ–≈À‹";
-const char MONTH_5_RU[]="Ã¿…";
-const char MONTH_6_RU[]="»ﬁÕ‹";
-const char MONTH_7_RU[]="»ﬁÀ‹";
-const char MONTH_8_RU[]="¿¬√”—“";
-const char MONTH_9_RU[]="—≈Õ“ﬂ¡–‹";
-const char MONTH_10_RU[]="Œ “ﬂ¡–‹";
-const char MONTH_11_RU[]="ÕŒﬂ¡–‹";
-const char MONTH_12_RU[]="ƒ≈ ¿¡–‹";
+const char MONTH_1_RU[]="–Ø–ù–í–ê–†–¨";
+const char MONTH_2_RU[]="–§–ï–í–†–ê–õ–¨";
+const char MONTH_3_RU[]="–ú–ê–†–¢";
+const char MONTH_4_RU[]="–ê–ü–†–ï–õ–¨";
+const char MONTH_5_RU[]="–ú–ê–ô";
+const char MONTH_6_RU[]="–ò–Æ–ù–¨";
+const char MONTH_7_RU[]="–ò–Æ–õ–¨";
+const char MONTH_8_RU[]="–ê–í–ì–£–°–¢";
+const char MONTH_9_RU[]="–°–ï–ù–¢–Ø–ë–†–¨";
+const char MONTH_10_RU[]="–û–ö–¢–Ø–ë–†–¨";
+const char MONTH_11_RU[]="–ù–û–Ø–ë–†–¨";
+const char MONTH_12_RU[]="–î–ï–ö–ê–ë–†–¨";
 
 #pragma warning enable 228
 
@@ -175,18 +181,20 @@ void delay_ms(volatile uint16_t val)
 //=============================================================================
 void interrupt handler(void)
     {
-    if(TMR0IF && TMR0IE)  //timer1 overflow
+    if(TMR0IF && TMR0IE)  //timer0 overflow
         {
         TMR0IF=0;
         TMR0=TMR0_OVF_PRELOAD;
 
         if(scrcnt) scrcnt--;
+        if(btncnt) btncnt--;
+        if(hldcnt) hldcnt--;
         }
     }
 
 
 //-----------------------------------------------------------------------------
-uint8_t get_key(void)
+uint8_t button_state(void)
     {
     uint8_t key = 0;
     uint16_t adc=0;
@@ -195,36 +203,53 @@ uint8_t get_key(void)
     while(GODONE);
     adc = ADRES;
 
-    for(uint8_t i=0; i<5; i++)
-        {
-        if(adc<keysadc[i])
-            {
-            key=i+1;
-            break;
-            }
-        }
+    if(adc<keysadc) key=1;
 
     return key;
     }
 
 
 //-----------------------------------------------------------------------------
-uint8_t check_keys(void)
+uint8_t button_check(void)
     {
     uint8_t k=0;
-    static uint8_t oldkey;
 
-    uint8_t newkey = get_key();
-    if(newkey != oldkey)
+    static uint8_t stage=0;
+
+    if(stage==0)
         {
-        delay_ms(50);
-        newkey = get_key();
-        if(newkey != oldkey)
+        if(button_state()==1) { stage=1; btncnt=EVENT_PERIOD(25); }
+        }
+    else if(stage==1)
+        {
+        if(btncnt==0)
             {
-            oldkey = newkey;
-            k=newkey;
+            if(button_state()==1) { stage=2; hldcnt=255; }
+            else stage=0;
             }
         }
+    else if(stage==2)
+        {
+        if(hldcnt<(255-(uint8_t)EVENT_PERIOD(500))) { stage=4; k=2; }
+        else if(button_state()==0) { stage=3; btncnt=EVENT_PERIOD(25); }
+        }
+    else if(stage==3)
+        {
+        if(btncnt==0)
+            {
+            if(button_state()==0) k=1;
+            stage=0;
+            }
+        }
+    else if(stage==4)
+        {
+        if(button_state()==0) { stage=5; btncnt=EVENT_PERIOD(25); }
+        }
+    else if(stage==5)
+        {
+        if(btncnt==0) stage=0;
+        }
+
     return k;
     }
 
@@ -262,7 +287,7 @@ void clock_shift_mode(uint8_t lang)
         rtc_read(rtcdata);
 
         int8_t tempmsb=ds3231_read_reg(0x11);
-        uint8_t templsb=ds3231_read_reg(0x12);
+        //uint8_t templsb=ds3231_read_reg(0x12);
 
         strbuffsum[0]=0; //"clear" the buffer
 
@@ -279,7 +304,8 @@ void clock_shift_mode(uint8_t lang)
         sprintf(strbuff, " 20%02u", rtcdata[YEAR_REG]);
         strcat(strbuffsum, strbuff);
 
-        sprintf(strbuff, " %+d.%u", tempmsb,(templsb>>6)*25);
+        //sprintf(strbuff, " %+d.%u", tempmsb,(templsb>>6)*25);
+        sprintf(strbuff, " %+d", tempmsb);
         strcat(strbuffsum, strbuff);
 
         strbufflen=strlen(strbuffsum);
@@ -301,6 +327,43 @@ void clock_compact_mode(void)
 
     sprintf(strbuff, "%02u:%02u:%02u", rtcdata[HOURS_REG], rtcdata[MINUTES_REG], rtcdata[SECONDS_REG]);
     matrix_print_small(0,strbuff);
+    }
+
+
+//-----------------------------------------------------------------------------
+void settings_clock_mode(uint8_t mode)
+    {
+    if(mode==5) scrcnt=EVENT_PERIOD(200);
+    else scrcnt=EVENT_PERIOD(500);
+
+    rtc_read(rtcdata);
+
+    matrix_clear_shift();
+
+    uint8_t t=0;
+
+    if(mode==1) { matrix_print_shift_compact(0,"MOD"); t=scrmode+1; }
+    if(mode==2) { matrix_print_shift_compact(0,"BRI"); t=scrbright+1; }
+    if(mode==3) { matrix_print_shift_compact(0,"HOU"); t=rtcdata[HOURS_REG]; }
+    if(mode==4) { matrix_print_shift_compact(0,"MIN"); t=rtcdata[MINUTES_REG]; }
+    if(mode==5) { matrix_print_shift_compact(0,"SEC"); t=rtcdata[SECONDS_REG]; }
+    if(mode==6) { matrix_print_shift_compact(0,"DAY"); t=rtcdata[DAY_REG]; }
+    if(mode==7) { matrix_print_shift_compact(0,"DAT"); t=rtcdata[DATE_REG]; }
+    if(mode==8) { matrix_print_shift_compact(0,"MON"); t=rtcdata[MONTH_REG]; }
+    if(mode==9) { matrix_print_shift_compact(0,"YEA"); t=rtcdata[YEAR_REG]; }
+
+    if(mode==1 || mode==2)
+        {
+        sprintf(strbuff, "%1u", t);
+        matrix_print_shift(32-5,strbuff);
+        }
+    else
+        {
+        sprintf(strbuff, "%02u", t);
+        matrix_print_shift((32-(5+5+2)),strbuff);
+        }
+
+    matrix_copy_shift(0);
     }
 
 
@@ -356,7 +419,7 @@ inline void sys_init(void)
 
     ADCON1 = 0b001111; //5-Vref=Vss //4+Vref=Vdd //Port
     ADCON0 = 0b000000; //Channel 0  //A/D converter module is disabled
-    //ADFM ó ACQT2 ACQT1 ACQT0 ADCS2 ADCS1 ADCS0
+    //ADFM ‚Äî ACQT2 ACQT1 ACQT0 ADCS2 ADCS1 ADCS0
     ADCON2 = 0b10010101; //TACQ 010=4TAD //TAD 101=FOSC/16 Fosc/16=0.5M=2us  //111=FRC
     ADON=1; //Turn on A/D module
     }
@@ -371,12 +434,12 @@ void main(void)
     delay_ms(100);  //delay for matrix power up
     maxtrix_init();
 
-    uint8_t scrbright=ee_read(BRIGHTNESS_EE_ADDR)&0b00000111;
+    scrbright=ee_read(BRIGHTNESS_EE_ADDR)&0b00000111;
     uint8_t oldbright=scrbright;
 
     MATRIX_BRIGHTNESS(scrbright);
 
-    uint8_t scrmode=ee_read(SCREENMODE_EE_ADDR);
+    scrmode=ee_read(SCREENMODE_EE_ADDR);
     uint8_t oldscrmode=scrmode;
 
     uint8_t setm=0;
@@ -386,41 +449,50 @@ void main(void)
         if(scrcnt==0)
             {
             DLED_GREEN;
-            if(scrmode==0) clock_normal_mode();
-            if(scrmode==1) clock_shift_mode(0);
-            if(scrmode==2) clock_shift_mode(1);
-            if(scrmode==3) clock_compact_mode();
+            if(setm==0)
+                {
+                if(scrmode==0) clock_normal_mode();
+                if(scrmode==1) clock_shift_mode(0);
+                if(scrmode==2) clock_shift_mode(1);
+                if(scrmode==3) clock_compact_mode();
+                }
+            else settings_clock_mode(setm);
+
             DLED_ORANGE;
             matrix_update();
             DLED_OFF;
             }
 
-        uint8_t key=check_keys();
+        uint8_t key=button_check();
 
         switch(key)
             {
-            case 0: break;
-            case 1: //----------- center ------------
-                    if(setm==0)
-                        {
-                        if(scrbright!=oldbright) { oldbright=scrbright; ee_write(BRIGHTNESS_EE_ADDR,scrbright); break; }
-                        if(scrmode!=oldscrmode) { oldscrmode=scrmode; ee_write(SCREENMODE_EE_ADDR,scrmode); break; }
-                        }
-                    break;
-            case 2: //----------- right -------------
-                    scrcnt=0;
-                    scrpos=0xffff;
+            case 2:
+                scrcnt=0;
+                scrpos=0xffff;
+                if(setm==1) { if(scrmode!=oldscrmode) { oldscrmode=scrmode; ee_write(SCREENMODE_EE_ADDR,scrmode); setm=0; break; } }
+                if(setm==2) { if(scrbright!=oldbright) { oldbright=scrbright; ee_write(BRIGHTNESS_EE_ADDR,scrbright); setm=0; break; } }
 
-                    if(setm==0) { uint8_t tmp = scrmode; if(++tmp>3) tmp=0; scrmode=tmp; }
-                    break;
-            case 3: //------------ left -------------
-                    break;
-            case 4: //------------ up ---------------
-                    if(setm==0) { uint8_t tmp=scrbright; if(++tmp>7) tmp=7; MATRIX_BRIGHTNESS(tmp); scrbright=tmp; }
-                    break;
-            case 5: //------------ down -------------
-                    if(setm==0) { int8_t tmp=scrbright; if(--tmp<0) tmp=0; MATRIX_BRIGHTNESS(tmp); scrbright=tmp; }
-                    break;
+                if(++setm>8) setm=0;
+                break;
+
+            case 1:
+                scrcnt=0;
+                scrpos=0xffff;
+
+                if(setm==0) {  }
+                if(setm==1) { uint8_t tmp=scrmode; if(++tmp>3) tmp=0; scrmode=tmp; }
+                if(setm==2) { uint8_t tmp=scrbright; if(++tmp>7) tmp=0; MATRIX_BRIGHTNESS(tmp); scrbright=tmp; }
+                if(setm==3) { uint8_t tmp=rtcdata[HOURS_REG]; if(++tmp>23) tmp=0; rtc_set_hrs(tmp); }
+                if(setm==4) { uint8_t tmp=rtcdata[MINUTES_REG]; if(++tmp>59) tmp=0; rtc_set_min(tmp); }
+                if(setm==5) { rtc_set_sec(0); }
+                if(setm==6) { uint8_t tmp=rtcdata[DAY_REG]; if(++tmp>7) tmp=1; rtc_set_day(tmp); }
+                if(setm==7) { uint8_t tmp=rtcdata[DATE_REG]; if(++tmp>31) tmp=1; rtc_set_dat(tmp); }
+                if(setm==8) { uint8_t tmp=rtcdata[MONTH_REG]; if(++tmp>12) tmp=1; rtc_set_mon(tmp); }
+                if(setm==9) { uint8_t tmp=rtcdata[YEAR_REG]; if(++tmp>99) tmp=0; rtc_set_year(tmp); }
+                break;
+
+            case 0: break;
             default: break;
             }
         }
