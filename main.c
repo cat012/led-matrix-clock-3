@@ -1,6 +1,6 @@
 // file: main.c
 // codepage: win-1251
-// 06-08-2019
+// 18-08-2019
 
 
 #include <stdio.h>
@@ -8,6 +8,7 @@
 #include <stdint.h>
 
 #include <string.h>
+#include <pic18f4520.h>
 
 #include "main.h"
 
@@ -26,15 +27,18 @@ uint8_t strbufflen=0;
 
 uint16_t scrpos=0xffff;
 
+uint8_t scrbright=0;
+uint8_t scrmode=0;
+/*
+uint8_t autobright=0;
+uint8_t oldautobright=0;
+uint16_t brightadc=0;
+ */
 volatile uint8_t scrcnt=0;
 volatile uint8_t btncnt=0;
 volatile uint8_t hldcnt=0;
 
-const uint8_t keysadc = 0xff;
-
-uint8_t scrbright=0;
-
-uint8_t scrmode=0;
+const uint8_t buttonadc = 0xff;
 
 
 const char DAY_1_EN[]="MONDAY";
@@ -86,6 +90,10 @@ const char MONTH_12_RU[]="ДЕКАБРЬ";
 
 //5376
 //498
+
+//6668
+//509
+
 
 //-----------------------------------------------------------------------------
 const char * month_name(uint8_t lang, uint8_t num)
@@ -194,16 +202,37 @@ void interrupt handler(void)
 
 
 //-----------------------------------------------------------------------------
-uint8_t button_state(void)
+uint16_t get_adc(uint8_t channel)
     {
-    uint8_t key = 0;
     uint16_t adc=0;
 
-    GODONE = 1;
-    while(GODONE);
-    adc = ADRES;
+    ADCON0=((channel<<2)&0b00111100);
 
-    if(adc<keysadc) key=1;
+    ADON=1;
+
+    GODONE=1;
+    while(GODONE);
+
+    GODONE=1;
+    while(GODONE);
+    adc=ADRES;
+
+    ADON=0;
+
+    return adc;
+    }
+
+
+//-----------------------------------------------------------------------------
+uint8_t button_state(void)
+    {
+    uint8_t key=0;
+
+    //DLED_ORANGE;
+
+    if(get_adc(0)<buttonadc) key=1;
+
+    //DLED_OFF;
 
     return key;
     }
@@ -216,38 +245,83 @@ uint8_t button_check(void)
 
     static uint8_t stage=0;
 
-    if(stage==0)
+    switch(stage)
         {
-        if(button_state()==1) { stage=1; btncnt=EVENT_PERIOD(25); }
-        }
-    else if(stage==1)
-        {
-        if(btncnt==0)
-            {
-            if(button_state()==1) { stage=2; hldcnt=255; }
-            else stage=0;
-            }
-        }
-    else if(stage==2)
-        {
-        if(hldcnt<(255-(uint8_t)EVENT_PERIOD(500))) { stage=4; k=2; }
-        else if(button_state()==0) { stage=3; btncnt=EVENT_PERIOD(25); }
-        }
-    else if(stage==3)
-        {
-        if(btncnt==0)
-            {
-            if(button_state()==0) k=1;
-            stage=0;
-            }
-        }
-    else if(stage==4)
-        {
-        if(button_state()==0) { stage=5; btncnt=EVENT_PERIOD(25); }
-        }
-    else if(stage==5)
-        {
-        if(btncnt==0) stage=0;
+        case 0:
+            if(btncnt==0)
+                {
+                btncnt=EVENT_PERIOD(25);
+
+                if(button_state()==1)
+                    {
+                    stage=1;
+                    }
+                }
+            break;
+
+        case 1:
+            if(btncnt==0)
+                {
+                if(button_state()==1)
+                    {
+                    stage=2;
+                    hldcnt=255;
+                    }
+                else stage=0;
+                }
+            break;
+
+        case 2:
+            if(hldcnt<(255-(uint8_t)EVENT_PERIOD(500)))
+                {
+                k=2;
+                stage=4;
+                }
+            else if(btncnt==0)
+                {
+                btncnt=EVENT_PERIOD(25);
+
+                if(button_state()==0)
+                    {
+                    stage=3;
+                    btncnt=EVENT_PERIOD(25);
+                    }
+                }
+            break;
+
+        case 3:
+            if(btncnt==0)
+                {
+                if(button_state()==0)
+                    {
+                    stage=0;
+                    k=1;
+                    }
+                }
+            break;
+
+        case 4:
+            if(btncnt==0)
+                {
+                btncnt=EVENT_PERIOD(25);
+
+                if(button_state()==0)
+                    {
+                    stage=5;
+                    btncnt=EVENT_PERIOD(25);
+                    }
+                }
+            break;
+
+        case 5:
+            if(btncnt==0)
+                {
+                if(button_state()==0)
+                    {
+                    stage=0;
+                    }
+                }
+            break;
         }
 
     return k;
@@ -263,6 +337,7 @@ void clock_normal_mode(void)
 
     matrix_clear_shift();
 
+
     sprintf(strbuff, "%2u", rtcdata[HOURS_REG]);
     matrix_print_shift(0,strbuff);
 
@@ -270,6 +345,11 @@ void clock_normal_mode(void)
 
     sprintf(strbuff, "%02u",rtcdata[MINUTES_REG]);
     matrix_print_shift(20,strbuff);
+
+/*
+    sprintf(strbuff, "%04u%1u", brightadc,autobright);
+    matrix_print_shift_compact(0,strbuff);
+*/
 
     matrix_copy_shift(0);
     }
@@ -331,7 +411,7 @@ void clock_compact_mode(void)
 
 
 //-----------------------------------------------------------------------------
-void settings_clock_mode(uint8_t mode)
+void clock_settings_mode(uint8_t mode)
     {
     if(mode==5) scrcnt=EVENT_PERIOD(200);
     else scrcnt=EVENT_PERIOD(500);
@@ -342,8 +422,8 @@ void settings_clock_mode(uint8_t mode)
 
     uint8_t t=0;
 
-    if(mode==1) { matrix_print_shift_compact(0,"MOD"); t=scrmode+1; }
-    if(mode==2) { matrix_print_shift_compact(0,"BRI"); t=scrbright+1; }
+    if(mode==1) { matrix_print_shift_compact(0,"MODE"); t=scrmode+1; }
+    if(mode==2) { matrix_print_shift_compact(0,"BRIG"); t=scrbright+1; }
     if(mode==3) { matrix_print_shift_compact(0,"HOU"); t=rtcdata[HOURS_REG]; }
     if(mode==4) { matrix_print_shift_compact(0,"MIN"); t=rtcdata[MINUTES_REG]; }
     if(mode==5) { matrix_print_shift_compact(0,"SEC"); t=rtcdata[SECONDS_REG]; }
@@ -417,11 +497,11 @@ inline void sys_init(void)
 
     CMCON=0b000111; //Comparators Off
 
-    ADCON1 = 0b001111; //5-Vref=Vss //4+Vref=Vdd //Port
+    ADCON1 = 0b001011; //5-Vref=Vss //4+Vref=Vdd //Port AN3-AN0
     ADCON0 = 0b000000; //Channel 0  //A/D converter module is disabled
     //ADFM — ACQT2 ACQT1 ACQT0 ADCS2 ADCS1 ADCS0
     ADCON2 = 0b10010101; //TACQ 010=4TAD //TAD 101=FOSC/16 Fosc/16=0.5M=2us  //111=FRC
-    ADON=1; //Turn on A/D module
+    //ADON=1; //Turn on A/D module
     }
 
 
@@ -447,8 +527,31 @@ void main(void)
     for(;;)
         {
         if(scrcnt==0)
-            {
-            DLED_GREEN;
+            {/*
+            brightadc=get_adc(3);
+            //if(brightadc>0) autobright=5;
+            //if(brightadc>100) autobright=2;
+            //if(brightadc>500) autobright=1;
+            //if(brightadc>700) autobright=0;
+
+            if(brightadc<=1023 && brightadc>900) autobright=0;
+            if(brightadc<800 && brightadc>700) autobright=1;
+
+
+            if(brightadc<600 && brightadc>500) autobright=2;
+            if(brightadc<400 && brightadc>300) autobright=3;
+            if(brightadc<200 && brightadc>100) autobright=4;
+            if(brightadc<50 && brightadc>40) autobright=5;
+            if(brightadc<30 && brightadc>20) autobright=6;
+            if(brightadc<10 && brightadc>=0) autobright=7;
+
+            if(oldautobright!=autobright)
+                {
+                oldautobright=autobright;
+                MATRIX_BRIGHTNESS(autobright);
+                }
+            */
+            //DLED_GREEN;
             if(setm==0)
                 {
                 if(scrmode==0) clock_normal_mode();
@@ -456,31 +559,30 @@ void main(void)
                 if(scrmode==2) clock_shift_mode(1);
                 if(scrmode==3) clock_compact_mode();
                 }
-            else settings_clock_mode(setm);
+            else clock_settings_mode(setm);
 
-            DLED_ORANGE;
+            //DLED_ORANGE;
             matrix_update();
-            DLED_OFF;
+            //DLED_OFF;
             }
 
-        uint8_t key=button_check();
-
-        switch(key)
+        switch(button_check())
             {
             case 2:
                 scrcnt=0;
                 scrpos=0xffff;
+
                 if(setm==1) { if(scrmode!=oldscrmode) { oldscrmode=scrmode; ee_write(SCREENMODE_EE_ADDR,scrmode); setm=0; break; } }
                 if(setm==2) { if(scrbright!=oldbright) { oldbright=scrbright; ee_write(BRIGHTNESS_EE_ADDR,scrbright); setm=0; break; } }
-
-                if(++setm>8) setm=0;
+                if(++setm>9) setm=0;
                 break;
 
             case 1:
+                if(setm==0) { break; }
+
                 scrcnt=0;
                 scrpos=0xffff;
 
-                if(setm==0) {  }
                 if(setm==1) { uint8_t tmp=scrmode; if(++tmp>3) tmp=0; scrmode=tmp; }
                 if(setm==2) { uint8_t tmp=scrbright; if(++tmp>7) tmp=0; MATRIX_BRIGHTNESS(tmp); scrbright=tmp; }
                 if(setm==3) { uint8_t tmp=rtcdata[HOURS_REG]; if(++tmp>23) tmp=0; rtc_set_hrs(tmp); }
