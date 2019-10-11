@@ -1,6 +1,6 @@
 // file: max7219.c
 // codepage: win-1251
-// 06-08-2019
+// 11-10-2019
 
 
 #include "max7219.h"
@@ -72,7 +72,7 @@ void matrix_fill(void)
 
 
 //-------------------------------------------------------------------------------------------------
-void maxtrix_init(void)
+void matrix_init(void)
     {
     MAX7219_SERIAL_INIT;  //port init
 

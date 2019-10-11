@@ -1,6 +1,6 @@
 // file: main.c
 // codepage: win-1251
-// 18-08-2019
+// 11-10-2019
 
 
 #include <stdio.h>
@@ -29,11 +29,7 @@ uint16_t scrpos=0xffff;
 
 uint8_t scrbright=0;
 uint8_t scrmode=0;
-/*
-uint8_t autobright=0;
-uint8_t oldautobright=0;
-uint16_t brightadc=0;
- */
+
 volatile uint8_t scrcnt=0;
 volatile uint8_t btncnt=0;
 volatile uint8_t hldcnt=0;
@@ -88,12 +84,8 @@ const char MONTH_12_RU[]="ДЕКАБРЬ";
 #pragma warning enable 228
 
 
-//5376
-//498
-
-//6668
+//6660
 //509
-
 
 //-----------------------------------------------------------------------------
 const char * month_name(uint8_t lang, uint8_t num)
@@ -138,7 +130,7 @@ const char * month_name(uint8_t lang, uint8_t num)
             }
         }
 
-    return 0;
+    return '\0';
     }
 
 
@@ -175,7 +167,7 @@ const char * day_name(uint8_t lang, uint8_t num)
             }
         }
 
-    return 0;
+    return '\0';
     }
 
 
@@ -226,15 +218,9 @@ uint16_t get_adc(uint8_t channel)
 //-----------------------------------------------------------------------------
 uint8_t button_state(void)
     {
-    uint8_t key=0;
+    if(get_adc(0)<buttonadc) return 1;
 
-    //DLED_ORANGE;
-
-    if(get_adc(0)<buttonadc) key=1;
-
-    //DLED_OFF;
-
-    return key;
+    return 0;
     }
 
 
@@ -252,7 +238,7 @@ uint8_t button_check(void)
                 {
                 btncnt=EVENT_PERIOD(25);
 
-                if(button_state()==1)
+                if(button_state())
                     {
                     stage=1;
                     }
@@ -262,7 +248,7 @@ uint8_t button_check(void)
         case 1:
             if(btncnt==0)
                 {
-                if(button_state()==1)
+                if(button_state())
                     {
                     stage=2;
                     hldcnt=255;
@@ -305,7 +291,7 @@ uint8_t button_check(void)
                 {
                 btncnt=EVENT_PERIOD(25);
 
-                if(button_state()==0)
+                if(!button_state()==0)
                     {
                     stage=5;
                     btncnt=EVENT_PERIOD(25);
@@ -345,11 +331,6 @@ void clock_normal_mode(void)
 
     sprintf(strbuff, "%02u",rtcdata[MINUTES_REG]);
     matrix_print_shift(20,strbuff);
-
-/*
-    sprintf(strbuff, "%04u%1u", brightadc,autobright);
-    matrix_print_shift_compact(0,strbuff);
-*/
 
     matrix_copy_shift(0);
     }
@@ -497,7 +478,7 @@ inline void sys_init(void)
 
     CMCON=0b000111; //Comparators Off
 
-    ADCON1 = 0b001011; //5-Vref=Vss //4+Vref=Vdd //Port AN3-AN0
+    ADCON1 = 0b001111; //5-Vref=Vss //4+Vref=Vdd //Port AN0
     ADCON0 = 0b000000; //Channel 0  //A/D converter module is disabled
     //ADFM — ACQT2 ACQT1 ACQT0 ADCS2 ADCS1 ADCS0
     ADCON2 = 0b10010101; //TACQ 010=4TAD //TAD 101=FOSC/16 Fosc/16=0.5M=2us  //111=FRC
@@ -512,7 +493,7 @@ void main(void)
     i2c_init();
     ds3231_init();
     delay_ms(100);  //delay for matrix power up
-    maxtrix_init();
+    matrix_init();
 
     scrbright=ee_read(BRIGHTNESS_EE_ADDR)&0b00000111;
     uint8_t oldbright=scrbright;
@@ -527,31 +508,7 @@ void main(void)
     for(;;)
         {
         if(scrcnt==0)
-            {/*
-            brightadc=get_adc(3);
-            //if(brightadc>0) autobright=5;
-            //if(brightadc>100) autobright=2;
-            //if(brightadc>500) autobright=1;
-            //if(brightadc>700) autobright=0;
-
-            if(brightadc<=1023 && brightadc>900) autobright=0;
-            if(brightadc<800 && brightadc>700) autobright=1;
-
-
-            if(brightadc<600 && brightadc>500) autobright=2;
-            if(brightadc<400 && brightadc>300) autobright=3;
-            if(brightadc<200 && brightadc>100) autobright=4;
-            if(brightadc<50 && brightadc>40) autobright=5;
-            if(brightadc<30 && brightadc>20) autobright=6;
-            if(brightadc<10 && brightadc>=0) autobright=7;
-
-            if(oldautobright!=autobright)
-                {
-                oldautobright=autobright;
-                MATRIX_BRIGHTNESS(autobright);
-                }
-            */
-            //DLED_GREEN;
+            {
             if(setm==0)
                 {
                 if(scrmode==0) clock_normal_mode();
@@ -561,9 +518,7 @@ void main(void)
                 }
             else clock_settings_mode(setm);
 
-            //DLED_ORANGE;
             matrix_update();
-            //DLED_OFF;
             }
 
         switch(button_check())

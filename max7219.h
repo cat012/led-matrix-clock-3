@@ -12,7 +12,7 @@
 //   7
 //-----------------
 //
-// 06-08-2019
+// 11-10-2019
 
 
 
@@ -63,7 +63,7 @@ extern const uint8_t font5x8[];
 extern const uint8_t font3x7[];
 
 
-void maxtrix_init(void);
+void matrix_init(void);
 
 void matrix_command(uint8_t addr, uint8_t data);
 
