@@ -1,8 +1,6 @@
-
 // 4x 8x8 LED matrix + IC MAX7219
 //
 // file: max7219.h
-// codepage: win-1251
 // compiler: XC8 1.33
 //
 //-----------------

@@ -2,6 +2,9 @@
 // codepage: win-1251
 // 11-10-2019
 
+// Program 6660
+// Data 509
+
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -84,8 +87,6 @@ const char MONTH_12_RU[]="ДЕКАБРЬ";
 #pragma warning enable 228
 
 
-//6660
-//509
 
 //-----------------------------------------------------------------------------
 const char * month_name(uint8_t lang, uint8_t num)

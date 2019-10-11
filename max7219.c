@@ -1,5 +1,4 @@
 // file: max7219.c
-// codepage: win-1251
 // 11-10-2019
 
 
@@ -112,7 +111,7 @@ void matrix_char_small(uint8_t xpos, uint8_t code)
         {
         for(uint8_t x=0; x<3; x++)
             {
-        	if(REG_BIT_IS_SET(font3x7[c*8+y],(2-x))) MATRIX_BUFF_PIXEL_ON((uint8_t)(x+xpos),y);
+            if(REG_BIT_IS_SET(font3x7[c*8+y],(2-x))) MATRIX_BUFF_PIXEL_ON((uint8_t)(x+xpos),y);
             }
         }
     }
