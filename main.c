@@ -292,7 +292,7 @@ uint8_t button_check(void)
                 {
                 btncnt=EVENT_PERIOD(25);
 
-                if(!button_state()==0)
+                if(button_state()==0)
                     {
                     stage=5;
                     btncnt=EVENT_PERIOD(25);
